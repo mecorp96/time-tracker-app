@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Play, Pause, Edit3, AlertCircle, CheckCircle, Clock, Plane, Briefcase, Square, Timer } from 'lucide-react';
 import { useTimeTracker } from '../hooks/useTimeTracker';
 import { formatDisplayTime, formatHours, calculateHours, getCurrentTime, getCurrentDate, formatCurrency } from '../utils/timeUtils';
 import { getWorkSessions, getVacationForDate, getCurrentScheduledJobs, getActiveJobs, createJobSession } from '../db/operations';
 
 const Home = () => {
+  const navigate = useNavigate();
   const {
     settings,
     workSchedule,
@@ -101,8 +103,8 @@ const Home = () => {
         </p>
         <div className="space-y-3">
           <a
-            href="/jobs"
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={() => navigate('/jobs')}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
           >
             <Briefcase className="h-4 w-4 mr-2" />
             Configurar Trabajos
@@ -167,12 +169,12 @@ const Home = () => {
                     Parar Todos
                   </button>
                 )}
-                <a
-                  href="/jobs"
-                  className="text-sm text-blue-600 hover:text-blue-700"
+                <button
+                  onClick={() => navigate('/jobs')}
+                  className="text-sm text-blue-600 hover:text-blue-700 cursor-pointer"
                 >
                   Gestionar
-                </a>
+                </button>
               </div>
             </div>
           </div>
