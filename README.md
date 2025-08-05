@@ -2,6 +2,20 @@
 
 Aplicación web React para tracking de tiempo y ganancias en tiempo real.
 
+[![Docker Build](https://github.com/mecorp96/time-tracker-app/actions/workflows/docker-build.yml/badge.svg)](https://github.com/mecorp96/time-tracker-app/actions/workflows/docker-build.yml)
+[![Test and Lint](https://github.com/mecorp96/time-tracker-app/actions/workflows/test.yml/badge.svg)](https://github.com/mecorp96/time-tracker-app/actions/workflows/test.yml/badge.svg)
+
+## 🎯 Características
+
+- ✅ **Tracking de tiempo en tiempo real** - Monitorea tus horas trabajadas al instante
+- ✅ **Múltiples trabajos simultáneos** - Gestiona varios proyectos a la vez
+- ✅ **Auto-inicio según horarios** - Se inicia automáticamente según tu programación
+- ✅ **Gestión de vacaciones** - Controla días libres y ausencias
+- ✅ **Estadísticas detalladas** - Resúmenes semanales y mensuales
+- ✅ **100% offline** - Funciona sin conexión usando localStorage
+- ✅ **Interfaz moderna** - Diseño responsive con TailwindCSS
+- ✅ **Docker ready** - Despliegue fácil con contenedores
+
 ## 🚀 Despliegue con Docker
 
 ### Opción 1: Docker Compose (Recomendado)
@@ -75,6 +89,10 @@ New_Project/
 ## 🛠️ Desarrollo Local
 
 ```bash
+# Clonar el repositorio
+git clone https://github.com/mecorp96/time-tracker-app.git
+cd time-tracker-app
+
 # Instalar dependencias
 npm install
 
@@ -86,7 +104,23 @@ npm run build
 
 # Preview de producción
 npm run preview
+
+# Ejecutar linting
+npm run lint
 ```
+
+## 🚀 CI/CD Pipeline
+
+Este proyecto incluye GitHub Actions para automatización:
+
+- **Docker Build**: Construye y publica la imagen Docker automáticamente
+- **Test & Lint**: Ejecuta tests y linting en cada PR
+- **Deployment**: Genera archivos de despliegue para diferentes entornos
+
+### Workflows disponibles:
+
+- `.github/workflows/docker-build.yml` - Build y push de imagen Docker
+- `.github/workflows/test.yml` - Tests y linting
 
 ## 🔍 Troubleshooting
 
