@@ -41,6 +41,11 @@ export const useTimeTracker = () => {
   const [isWorking, setIsWorking] = useState(false);
   const [shouldBeWorking, setShouldBeWorking] = useState(false);
   const [currentTime, setCurrentTime] = useState(getCurrentTime());
+  const [pausedAutoStartJobs, setPausedAutoStartJobs] = useState(() => {
+    // Load paused jobs from localStorage
+    const saved = localStorage.getItem('time-tracker-paused-jobs');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  }); // Jobs with paused auto-start
 
   // NO CONFLICT DETECTION - User has total freedom
   const detectJobConflicts = useCallback((scheduledJobs) => {
@@ -216,6 +221,43 @@ export const useTimeTracker = () => {
     }
   }, [loadData]);
 
+  // Pause auto-start for a specific job
+  const pauseAutoStart = useCallback((jobId) => {
+    console.log('⏸️ Pausing auto-start for job:', jobId);
+    setPausedAutoStartJobs(prev => {
+      const newSet = new Set([...prev, jobId]);
+      // Save to localStorage
+      localStorage.setItem('time-tracker-paused-jobs', JSON.stringify([...newSet]));
+      return newSet;
+    });
+  }, []);
+
+  // Resume auto-start for a specific job
+  const resumeAutoStart = useCallback((jobId) => {
+    console.log('▶️ Resuming auto-start for job:', jobId);
+    setPausedAutoStartJobs(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(jobId);
+      // Save to localStorage
+      localStorage.setItem('time-tracker-paused-jobs', JSON.stringify([...newSet]));
+      return newSet;
+    });
+      }, []);
+
+  // Clean up paused jobs that no longer exist
+  const cleanupPausedJobs = useCallback(() => {
+    const activeJobIds = activeJobs.map(job => job.id);
+    const currentPausedJobs = [...pausedAutoStartJobs];
+    const validPausedJobs = currentPausedJobs.filter(jobId => activeJobIds.includes(jobId));
+    
+    if (validPausedJobs.length !== currentPausedJobs.length) {
+      console.log('🧹 Cleaning up paused jobs for deleted jobs');
+      const newSet = new Set(validPausedJobs);
+      localStorage.setItem('time-tracker-paused-jobs', JSON.stringify([...newSet]));
+      setPausedAutoStartJobs(newSet);
+    }
+  }, [activeJobs, pausedAutoStartJobs]);
+
   // AUTO-START/STOP with manual override capability
   const checkAutoStartStop = useCallback(() => {
     const today = getCurrentDate();
@@ -247,12 +289,14 @@ export const useTimeTracker = () => {
         activeSessionsCount: activeSessions.length
       });
       
-      // Auto-start jobs that should be working (but don't have active sessions)
+      // Auto-start jobs that should be working (but don't have active sessions and are not paused)
       currentScheduledJobs.forEach(({ job, schedule }) => {
-        if (!hasActiveSessionForJob(job.id)) {
+        if (!hasActiveSessionForJob(job.id) && !pausedAutoStartJobs.has(job.id)) {
           console.log(`⏰ AUTO-STARTING JOB: ${job.name} (scheduled: ${schedule.start_time}-${schedule.end_time})`);
           // Start from the scheduled start time, not current time
           startJobWork(job.id, schedule.start_time, true); // Pass scheduled start time and true for isAutoStarted
+        } else if (pausedAutoStartJobs.has(job.id)) {
+          console.log(`⏸️ SKIPPING AUTO-START: ${job.name} (paused by user)`);
         }
       });
       
@@ -344,6 +388,13 @@ export const useTimeTracker = () => {
     }
   }, [settings, workSchedule, checkAutoStartStop]);
 
+  // Clean up paused jobs when active jobs change
+  useEffect(() => {
+    if (activeJobs.length > 0) {
+      cleanupPausedJobs();
+    }
+  }, [activeJobs, cleanupPausedJobs]);
+
   const refreshData = useCallback(() => {
     console.log('🔄 Refreshing data manually...');
     loadData();
@@ -404,6 +455,8 @@ export const useTimeTracker = () => {
     startJobWork, // NEW: Start specific job
     endJobWork, // NEW: End specific job
     endAllWork, // NEW: End all active sessions
+    pauseAutoStart, // NEW: Pause auto-start for job
+    resumeAutoStart, // NEW: Resume auto-start for job
     startWorkFromSchedule,
     refreshData,
     

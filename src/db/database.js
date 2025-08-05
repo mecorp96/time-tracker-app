@@ -24,6 +24,9 @@ export const initDatabase = async () => {
     if (!localStorage.getItem('time-tracker-job-schedules')) {
       localStorage.setItem('time-tracker-job-schedules', JSON.stringify([]));
     }
+    if (!localStorage.getItem('time-tracker-paused-jobs')) {
+      localStorage.setItem('time-tracker-paused-jobs', JSON.stringify([]));
+    }
     isInitialized = true;
   }
   return true;

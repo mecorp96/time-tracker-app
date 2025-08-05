@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Home, BarChart3, Settings, Clock, Edit3, Plane, Briefcase } from 'lucide-react';
+import { Home, BarChart3, Clock, Edit3, Plane, Briefcase } from 'lucide-react';
 
 const Layout = () => {
   const location = useLocation();
@@ -10,11 +10,10 @@ const Layout = () => {
 
   const navItems = [
     { path: '/', icon: Home, label: 'Inicio' },
-    { path: '/jobs', icon: Briefcase, label: 'Trabajos' }, // PRIORITIZED
+    { path: '/jobs', icon: Briefcase, label: 'Trabajos' },
     { path: '/sessions', icon: Edit3, label: 'Sesiones' },
     { path: '/stats', icon: BarChart3, label: 'Estadísticas' },
-    { path: '/vacations', icon: Plane, label: 'Vacaciones' },
-    { path: '/settings', icon: Settings, label: 'Config' } // REDUCED LABEL
+    { path: '/vacations', icon: Plane, label: 'Vacaciones' }
   ];
 
   return (

@@ -5,7 +5,10 @@ import {
   deleteWorkSession, 
   updateWorkSession,
   createWorkSession,
-  getUserSettings 
+  createJobSession,
+  endWorkSession,
+  getUserSettings,
+  getActiveJobs
 } from '../db/operations';
 import { 
   formatDisplayDate, 
@@ -17,6 +20,7 @@ import {
 
 const Sessions = () => {
   const [sessions, setSessions] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingSession, setEditingSession] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -26,7 +30,8 @@ const Sessions = () => {
   const [newSession, setNewSession] = useState({
     date: getCurrentDate(),
     start_time: '09:00',
-    end_time: '17:00'
+    end_time: '17:00',
+    job_id: null
   });
 
   useEffect(() => {
@@ -37,9 +42,22 @@ const Sessions = () => {
     setLoading(true);
     const allSessions = getWorkSessions();
     const userSettings = getUserSettings();
+    const activeJobs = getActiveJobs();
     setSessions(allSessions);
     setSettings(userSettings);
+    setJobs(activeJobs);
     setLoading(false);
+  };
+
+  const getJobForSession = (session) => {
+    if (session.job_id) {
+      console.log('🔍 Looking for job_id:', session.job_id, 'type:', typeof session.job_id);
+      console.log('🔍 Available jobs:', jobs.map(j => ({ id: j.id, name: j.name, type: typeof j.id })));
+      const job = jobs.find(job => job.id == session.job_id); // Use == for type coercion
+      console.log('🔍 Found job:', job);
+      return job;
+    }
+    return null;
   };
 
   const handleDeleteSession = (sessionId) => {
@@ -68,12 +86,44 @@ const Sessions = () => {
       return;
     }
 
-    updateWorkSession(
-      editingSession.id,
-      editingSession.start_time,
-      editingSession.end_time,
-      true // Mark as manually edited
-    );
+    // Get all sessions
+    const sessions = getWorkSessions();
+    const sessionIndex = sessions.findIndex(s => s.id === editingSession.id);
+    
+    if (sessionIndex !== -1) {
+      const session = sessions[sessionIndex];
+      let hourlyRate = session.hourly_rate; // Default to existing rate
+      
+      // If job_id changed, update the hourly rate
+      if (editingSession.job_id) {
+        const job = jobs.find(j => j.id == editingSession.job_id); // Use == for type coercion
+        if (job) {
+          hourlyRate = job.hourly_rate;
+        }
+      } else if (!editingSession.job_id && settings) {
+        // If no job selected, use settings rate
+        hourlyRate = settings.hourly_rate;
+      }
+      
+      // Calculate new earnings with the (possibly new) hourly rate
+      const hours = calculateHours(editingSession.start_time, editingSession.end_time);
+      const earnings = hours * hourlyRate;
+      
+      // Update the session
+      sessions[sessionIndex] = {
+        ...session,
+        start_time: editingSession.start_time,
+        end_time: editingSession.end_time,
+        job_id: editingSession.job_id || null,
+        hourly_rate: hourlyRate,
+        earnings: earnings,
+        is_manual: 1, // Mark as manually edited
+        updated_at: new Date().toISOString()
+      };
+      
+      // Save to localStorage
+      localStorage.setItem('time-tracker-sessions', JSON.stringify(sessions));
+    }
 
     setEditingSession(null);
     loadData();
@@ -94,20 +144,34 @@ const Sessions = () => {
       return;
     }
 
-    if (!settings) {
-      alert('No hay configuración de tarifa. Ve a Configuración primero.');
-      return;
+    let sessionId;
+    
+    if (newSession.job_id) {
+      // Create job session
+      const job = jobs.find(j => j.id == newSession.job_id); // Use == for type coercion
+      if (!job) {
+        alert('Trabajo no encontrado');
+        return;
+      }
+      sessionId = createJobSession(newSession.job_id, newSession.date, newSession.start_time);
+    } else {
+      // Create legacy session
+      if (!settings) {
+        alert('No hay configuración de tarifa. Ve a Configuración primero o selecciona un trabajo.');
+        return;
+      }
+      sessionId = createWorkSession(newSession.date, newSession.start_time, settings.hourly_rate);
     }
 
-    // Create session and immediately end it
-    const sessionId = createWorkSession(newSession.date, newSession.start_time, settings.hourly_rate);
-    updateWorkSession(sessionId, newSession.start_time, newSession.end_time, true);
+    // End the session immediately with the end time
+    endWorkSession(sessionId, newSession.end_time);
 
     setShowAddForm(false);
     setNewSession({
       date: getCurrentDate(),
       start_time: '09:00',
-      end_time: '17:00'
+      end_time: '17:00',
+      job_id: null
     });
     loadData();
   };
@@ -174,16 +238,33 @@ const Sessions = () => {
         <div className="bg-white rounded-xl shadow-sm border p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Nueva Sesión Manual</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Fecha</label>
-              <input
-                type="date"
-                value={newSession.date}
-                onChange={(e) => setNewSession(prev => ({ ...prev, date: e.target.value }))}
+              <label className="block text-sm font-medium text-gray-700 mb-2">Trabajo</label>
+              <select
+                value={newSession.job_id || ''}
+                onChange={(e) => setNewSession(prev => ({ ...prev, job_id: e.target.value || null }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+              >
+                <option value="">Sesión sin trabajo específico</option>
+                {jobs.map(job => (
+                  <option key={job.id} value={job.id}>
+                    {job.name} (€{job.hourly_rate}/hora)
+                  </option>
+                ))}
+              </select>
             </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fecha</label>
+                <input
+                  type="date"
+                  value={newSession.date}
+                  onChange={(e) => setNewSession(prev => ({ ...prev, date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Hora Inicio</label>
@@ -204,6 +285,7 @@ const Sessions = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
+          </div>
           </div>
           
           <div className="flex items-center space-x-3 mt-4">
@@ -266,6 +348,24 @@ const Sessions = () => {
                       {editingSession && editingSession.id === session.id ? (
                         // Edit Mode
                         <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Trabajo</label>
+                            <select
+                              value={editingSession.job_id || ''}
+                              onChange={(e) => setEditingSession(prev => ({ 
+                                ...prev, 
+                                job_id: e.target.value || null 
+                              }))}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500"
+                            >
+                              <option value="">Sin trabajo específico</option>
+                              {jobs.map(job => (
+                                <option key={job.id} value={job.id}>
+                                  {job.name} (€{job.hourly_rate}/hora)
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="block text-xs text-gray-500 mb-1">Hora Inicio</label>
@@ -326,6 +426,28 @@ const Sessions = () => {
                                 ({formatHours(calculateHours(session.start_time, session.end_time))})
                               </span>
                             )}
+                            
+                            {(() => {
+                              const job = getJobForSession(session);
+                              return job ? (
+                                <div className="flex items-center space-x-2">
+                                  <div 
+                                    className="w-3 h-3 rounded-full" 
+                                    style={{backgroundColor: job.color}}
+                                  ></div>
+                                  <span className="text-sm text-gray-700 font-medium">
+                                    {job.name}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    €{job.hourly_rate}/hora
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-500 italic">
+                                  Sin trabajo asignado
+                                </span>
+                              );
+                            })()}
                             
                             <div className="flex items-center space-x-2">
                               {session.is_manual === 1 && (

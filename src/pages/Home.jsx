@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Play, Pause, Edit3, AlertCircle, CheckCircle, Clock, Plane, Save, X, Briefcase, Square } from 'lucide-react';
+import { Play, Pause, Edit3, AlertCircle, CheckCircle, Clock, Plane, Briefcase, Square, Timer } from 'lucide-react';
 import { useTimeTracker } from '../hooks/useTimeTracker';
 import { formatDisplayTime, formatHours, calculateHours, getCurrentTime, getCurrentDate, formatCurrency } from '../utils/timeUtils';
-import { getWorkSessions, getVacationForDate, createWorkSession, updateWorkSession, getCurrentScheduledJobs, getActiveJobs, createJobSession } from '../db/operations';
+import { getWorkSessions, getVacationForDate, getCurrentScheduledJobs, getActiveJobs, createJobSession } from '../db/operations';
 
 const Home = () => {
   const {
@@ -23,10 +23,11 @@ const Home = () => {
     startJobWork: hookStartJobWork,
     endJobWork: hookEndJobWork,
     endAllWork: hookEndAllWork,
+    pauseAutoStart,
+    resumeAutoStart,
     startWorkFromSchedule,
     getTodaysWorkStartTime,
     formatEarnings,
-    hasSettings,
     hasSchedule,
     hasJobs,
     hasJobConflicts,
@@ -35,28 +36,36 @@ const Home = () => {
     refreshData
   } = useTimeTracker();
 
-  const [showManualEdit, setShowManualEdit] = useState(false);
-  const [manualEditData, setManualEditData] = useState({
-    startTime: getCurrentTime().slice(0, 5),
-    endTime: getCurrentTime().slice(0, 5),
-    isAddingTime: false
-  });
 
-  useEffect(() => {
-    if (activeSession) {
-      setManualEditData(prev => ({
-        ...prev,
-        startTime: activeSession.start_time,
-        endTime: getCurrentTime().slice(0, 5)
-      }));
-    }
-  }, [activeSession]);
+
+
 
   const directStartJob = (jobId) => {
     console.log('🚀 directStartJob called with jobId:', jobId);
     const result = hookStartJobWork(jobId, null, false); // Explicitly pass false for isAutoStarted
     console.log('🚀 Direct start result:', result);
     return result;
+  };
+
+  const startJobFromSchedule = (jobId) => {
+    console.log('⏰ startJobFromSchedule called for:', jobId);
+    // Get current scheduled jobs to find the start time
+    const currentScheduledJobs = getCurrentScheduledJobs();
+    const scheduledJob = currentScheduledJobs.find(({ job }) => job.id === jobId);
+    
+    if (scheduledJob) {
+      console.log('⏰ Starting from scheduled time:', scheduledJob.schedule.start_time);
+      hookStartJobWork(jobId, scheduledJob.schedule.start_time, false); // Start from scheduled time but not auto-started
+    } else {
+      console.log('⏰ No schedule found, starting from current time');
+      // Fallback: start from current time if no schedule found
+      directStartJob(jobId);
+    }
+  };
+
+  const getJobScheduleForNow = (jobId) => {
+    const currentScheduledJobs = getCurrentScheduledJobs();
+    return currentScheduledJobs.find(({ job }) => job.id === jobId);
   };
 
   const cancelAutoStart = (jobId) => {
@@ -68,73 +77,19 @@ const Home = () => {
       console.log('🚫 Found active session to cancel:', jobSession);
       // Stop the auto-started session
       hookEndJobWork(jobId);
-      // Refresh data to update UI
-      refreshData();
-    } else {
-      console.log('🚫 No active session found for job:', jobId);
     }
-  };
-
-  const handleManualEdit = () => {
-    setShowManualEdit(true);
     
-    if (activeSession) {
-      setManualEditData({
-        startTime: activeSession.start_time,
-        endTime: getCurrentTime().slice(0, 5),
-        isAddingTime: false
-      });
-    } else {
-      const now = getCurrentTime().slice(0, 5);
-      setManualEditData({
-        startTime: now,
-        endTime: now,
-        isAddingTime: true
-      });
-    }
+    // Pause auto-start for this job to prevent it from restarting
+    pauseAutoStart(jobId);
+    
+    // Refresh data to update UI
+    refreshData();
   };
 
-  const handleSaveManualEdit = () => {
-    if (!manualEditData.startTime || !manualEditData.endTime) {
-      alert('Por favor, completa las horas de inicio y fin');
-      return;
-    }
 
-    if (manualEditData.startTime >= manualEditData.endTime) {
-      alert('La hora de inicio debe ser anterior a la hora de fin');
-      return;
-    }
 
-    if (!settings) {
-      alert('No hay configuración de tarifa configurada');
-      return;
-    }
-
-    try {
-      if (manualEditData.isAddingTime) {
-        const today = getCurrentDate();
-        const sessionId = createWorkSession(today, manualEditData.startTime, settings.hourly_rate);
-        updateWorkSession(sessionId, manualEditData.startTime, manualEditData.endTime, true);
-      } else if (activeSession) {
-        updateWorkSession(
-          activeSession.id, 
-          manualEditData.startTime, 
-          manualEditData.endTime, 
-          true
-        );
-      }
-
-      refreshData();
-      setShowManualEdit(false);
-      alert('Ajuste guardado correctamente');
-    } catch (error) {
-      console.error('Error saving manual edit:', error);
-      alert('Error al guardar el ajuste');
-    }
-  };
-
-  // Only show settings requirement if no jobs are configured
-  if (!hasSettings && !hasJobs) {
+  // Show jobs requirement if no jobs are configured
+  if (!hasJobs) {
     return (
       <div className="text-center py-12">
         <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
@@ -151,14 +106,6 @@ const Home = () => {
           >
             <Briefcase className="h-4 w-4 mr-2" />
             Configurar Trabajos
-          </a>
-          <br />
-          <a
-            href="/settings"
-            className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            <AlertCircle className="h-4 w-4 mr-2" />
-            Configuración Legacy
           </a>
         </div>
       </div>
@@ -287,13 +234,27 @@ const Home = () => {
                           <span>Parar</span>
                         </button>
                       ) : (
-                        <button
-                          onClick={() => directStartJob(job.jobId)}
-                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1"
-                        >
-                          <Play className="h-3 w-3" />
-                          <span>Iniciar</span>
-                        </button>
+                        <>
+                          <button
+                            onClick={() => directStartJob(job.jobId)}
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1"
+                          >
+                            <Play className="h-3 w-3" />
+                            <span>Ahora</span>
+                          </button>
+                          {(() => {
+                            const scheduleInfo = getJobScheduleForNow(job.jobId);
+                            return scheduleInfo ? (
+                              <button
+                                onClick={() => startJobFromSchedule(job.jobId)}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1"
+                              >
+                                <Timer className="h-3 w-3" />
+                                <span>Desde {scheduleInfo.schedule.start_time}</span>
+                              </button>
+                            ) : null;
+                          })()}
+                        </>
                       )}
                     </div>
                   </div>
@@ -315,13 +276,27 @@ const Home = () => {
                       <p className="text-sm text-gray-500">€{job.hourly_rate}/hora • Sin actividad hoy</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => directStartJob(job.id)}
-                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1"
-                  >
-                    <Play className="h-3 w-3" />
-                    <span>Iniciar</span>
-                  </button>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => directStartJob(job.id)}
+                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1"
+                    >
+                      <Play className="h-3 w-3" />
+                      <span>Ahora</span>
+                    </button>
+                    {(() => {
+                      const scheduleInfo = getJobScheduleForNow(job.id);
+                      return scheduleInfo ? (
+                        <button
+                          onClick={() => startJobFromSchedule(job.id)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1"
+                        >
+                          <Timer className="h-3 w-3" />
+                          <span>Desde {scheduleInfo.schedule.start_time}</span>
+                        </button>
+                      ) : null;
+                    })()}
+                  </div>
                 </div>
               </div>
             ))}
@@ -399,102 +374,16 @@ const Home = () => {
       )}
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={handleManualEdit}
-          className="flex items-center justify-center px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
-        >
-          <Edit3 className="h-4 w-4 mr-2" />
-          Ajustar
-        </button>
-        
+      <div className="flex justify-center">
         <a
           href="/sessions"
-          className="flex items-center justify-center px-4 py-3 bg-purple-100 text-purple-700 rounded-xl hover:bg-purple-200 transition-colors"
+          className="flex items-center justify-center px-6 py-3 bg-purple-100 text-purple-700 rounded-xl hover:bg-purple-200 transition-colors"
         >
           <Edit3 className="h-4 w-4 mr-2" />
           Sesiones
         </a>
       </div>
 
-      {/* Manual Edit Modal */}
-      {showManualEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full mx-4">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {manualEditData.isAddingTime ? 'Agregar Tiempo Manual' : 'Ajustar Sesión Actual'}
-                </h3>
-                <button
-                  onClick={() => setShowManualEdit(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Hora de Inicio
-                  </label>
-                  <input
-                    type="time"
-                    value={manualEditData.startTime}
-                    onChange={(e) => setManualEditData(prev => ({ ...prev, startTime: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Hora de Fin
-                  </label>
-                  <input
-                    type="time"
-                    value={manualEditData.endTime}
-                    onChange={(e) => setManualEditData(prev => ({ ...prev, endTime: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                {manualEditData.startTime && manualEditData.endTime && manualEditData.startTime < manualEditData.endTime && (
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <div className="text-sm text-blue-800">
-                      <strong>Duración:</strong> {formatHours(calculateHours(manualEditData.startTime, manualEditData.endTime))}
-                      {settings && (
-                        <>
-                          <br />
-                          <strong>Ganancias:</strong> {formatCurrency(calculateHours(manualEditData.startTime, manualEditData.endTime) * settings.hourly_rate)}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center space-x-3 pt-4">
-                  <button
-                    onClick={handleSaveManualEdit}
-                    className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    Guardar
-                  </button>
-                  
-                  <button
-                    onClick={() => setShowManualEdit(false)}
-                    className="flex-1 flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -6,7 +6,6 @@ import Stats from './pages/Stats';
 import Sessions from './pages/Sessions';
 import Jobs from './pages/Jobs';
 import Vacations from './pages/Vacations';
-import Settings from './pages/Settings';
 
 function App() {
   const { isInitialized, isLoading, error } = useDatabase();
@@ -63,7 +62,6 @@ function App() {
           <Route path="sessions" element={<Sessions />} />
           <Route path="jobs" element={<Jobs />} />
           <Route path="vacations" element={<Vacations />} />
-          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </Router>
