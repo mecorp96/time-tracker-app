@@ -55,7 +55,7 @@ function App() {
   }
 
   return (
-    <Router>
+    <Router basename={import.meta.env.PROD ? '/time-tracker-app' : '/'}>
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />

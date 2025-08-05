@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug GitHub Pages</title>
+</head>
+<body>
+    <h1>Debug GitHub Pages</h1>
+    <div id="status"></div>
+    <script>
+        const status = document.getElementById('status');
+        
+        // Test 1: Check if main page loads
+        fetch('https://mecorp96.github.io/time-tracker-app/')
+            .then(response => {
+                status.innerHTML += `<p>✅ Main page: ${response.status} ${response.statusText}</p>`;
+                return response.text();
+            })
+            .then(html => {
+                const jsMatch = html.match(/index-[a-zA-Z0-9_-]*\.js/);
+                if (jsMatch) {
+                    status.innerHTML += `<p>✅ JS file found: ${jsMatch[0]}</p>`;
+                    
+                    // Test 2: Check if JS file loads
+                    return fetch(`https://mecorp96.github.io/time-tracker-app/assets/${jsMatch[0]}`);
+                } else {
+                    status.innerHTML += `<p>❌ JS file not found in HTML</p>`;
+                }
+            })
+            .then(response => {
+                if (response) {
+                    status.innerHTML += `<p>✅ JS file: ${response.status} ${response.statusText}</p>`;
+                }
+            })
+            .catch(error => {
+                status.innerHTML += `<p>❌ Error: ${error.message}</p>`;
+            });
+            
+        // Test 3: Check if CSS file loads
+        fetch('https://mecorp96.github.io/time-tracker-app/assets/index-CuHyc0N0.css')
+            .then(response => {
+                status.innerHTML += `<p>✅ CSS file: ${response.status} ${response.statusText}</p>`;
+            })
+            .catch(error => {
+                status.innerHTML += `<p>❌ CSS Error: ${error.message}</p>`;
+            });
+    </script>
+</body>
+</html> 
