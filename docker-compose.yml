@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  time-tracker:
+    build: .
+    container_name: time-tracker-app
+    ports:
+      - "9090:80"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.time-tracker.rule=Host(`timetracker.local`)"
+      - "traefik.http.services.time-tracker.loadbalancer.server.port=80"
+      - "traefik.docker.network=web"
+    networks:
+      - web
+
+networks:
+  web:
+    external: true 
