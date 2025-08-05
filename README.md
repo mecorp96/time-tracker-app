@@ -13,9 +13,17 @@ Aplicación web React para tracking de tiempo y ganancias en tiempo real.
 - ✅ **Interfaz moderna** - Diseño responsive con TailwindCSS
 - ✅ **Docker ready** - Despliegue fácil con contenedores
 
-## 🚀 Despliegue con Docker
+## 🚀 Despliegue
 
-### Opción 1: Docker Compose (Recomendado)
+### Opción 1: GitHub Pages (Recomendado)
+
+La aplicación se despliega automáticamente en GitHub Pages con cada push a main.
+
+- **URL:** https://mecorp96.github.io/time-tracker-app/
+- **Deploy automático** - Se actualiza con cada commit
+- **Sin configuración** - Funciona directamente
+
+### Opción 2: Docker Compose
 
 ```bash
 # Clonar el repositorio
@@ -141,6 +149,10 @@ docker exec time-tracker-app tail -f /var/log/nginx/access.log
 
 ## 📱 Acceso
 
-Una vez desplegado, la aplicación estará disponible en:
+### GitHub Pages (Producción)
+- **URL:** https://mecorp96.github.io/time-tracker-app/
+- **Deploy automático** con cada push a main
+
+### Docker Local
 - **URL:** http://localhost:9090
 - **Health Check:** http://localhost:9090/health
