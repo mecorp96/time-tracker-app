@@ -36,6 +36,9 @@ jobs:
       env:
         NODE_ENV: production
 
+    - name: List build files
+      run: ls -la dist/
+
     - name: Setup Pages
       uses: actions/configure-pages@v4
 
